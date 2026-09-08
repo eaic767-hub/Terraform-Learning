@@ -1,54 +1,59 @@
 resource "aws_instance" "nginx-server" {
-  ami           = "ami-0c7217cdde317cfec" # Amazon Linux 2023 AMI en us-east-1
-  instance_type = "t3.micro"
+  ami                         = "ami-0c7217cdde317cfec" # Ubuntu 22.04 LTS
+  instance_type               = "t3.micro"
+  associate_public_ip_address = true
 
-  ##instalación, habilitación e inicializacion de nginx
+  # Instalación y configuración automática para UBUNTU
   user_data = <<-EOF
               #!/bin/bash
-              sudo yum install -y nginx
-              sudo systemctl enable nginx
-              sudo systemctl start nginx
+              apt update -y
+              apt install -y nginx
+              echo "<h1>¡Hola desde mi servidor Nginx desplegado con Terraform!</h1>" > /var/www/html/index.html
+              systemctl enable --now nginx
               EOF
-    
-  #linkeo el resource externo ssh
-  key_name = aws_key_pair.nginx-server-ssh.key_name
-  
-  #linkeo el resource externo sg
-  vpc_security_group_ids = [ aws_security_group.nginx-server-sg.id ]
-  #Etiqueta del nombre del servidor       
+
+  user_data_replace_on_change = true
+  key_name                    = aws_key_pair.nginx-server-ssh.key_name
+  vpc_security_group_ids      = [aws_security_group.nginx-server-sg.id]
+
   tags = {
     Name = "Servidor-Prueba"
   }
 }
-##recurso de la clave generada en git bash...
-######SSH######
+
 resource "aws_key_pair" "nginx-server-ssh" {
-  key_name = "nginx-server-ssh"
+  key_name   = "nginx-server-ssh"
   public_key = file("nginx-server.key.pub")
 }
-######SG#####
+
 resource "aws_security_group" "nginx-server-sg" {
-  name = "nginx-server-sg"
+  name        = "nginx-server-sg"
   description = "security grup allowing SSH and HTTPS access"
 
   ingress {
-    from_port = 22
-    to_port = 22
-    protocol = "tcp"
-    cidr_blocks = [ "0.0.0.0/0" ]
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
-    from_port = 80
-    to_port = 80
-    protocol = "tcp"
-    cidr_blocks = [ "0.0.0.0/0" ]
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
-    from_port = 0
-    to_port = 0
-    protocol = "-1"
-    cidr_blocks = [ "0.0.0.0/0" ]
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
   }
+}
+
+# Muestra la URL directamente en tu terminal local al terminar
+output "url_servidor" {
+  value       = "http://${aws_instance.nginx-server.public_ip}"
+  description = "Acceso directo a la página web"
 }
